@@ -1,7 +1,5 @@
-# services/memory_manager.py
 from typing import Dict, List
 
-# Simple in-memory store for now; can later swap with Redis or DB
 _conversations: Dict[str, List[dict]] = {}
 
 def get_conversation(session_id: str) -> List[dict]:

@@ -16,7 +16,6 @@ async def generate_followup_question(payload: InterviewRequest, session_id: str)
     
     conversation = get_conversation(session_id)
     
-    # If this is a new session, start fresh
     if not conversation:
         add_message(session_id, "system", SYSTEM_PROMPT)
         add_message(session_id, "user", f"Original Question: {payload.question}")
@@ -25,7 +24,7 @@ async def generate_followup_question(payload: InterviewRequest, session_id: str)
     # Add candidate's latest answer
     add_message(session_id, "user", f"Candidate Answer: {payload.answer}")
     
-    # Send the full conversation context to OpenAI
+    #Sending the full conversation to the api
     response = await client.chat.completions.create(
         model="gpt-4o-mini",
         messages=get_conversation(session_id),
