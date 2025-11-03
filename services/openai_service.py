@@ -1,39 +1,39 @@
 import os
 from openai import AsyncOpenAI
 from schemas import InterviewRequest
+from services.memory_manager import add_message, get_conversation
 
+client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-api_key = os.getenv("OPENAI_API_KEY")
-client = AsyncOpenAI(api_key=api_key)
+SYSTEM_PROMPT = (
+    "You are an expert interviewer who asks concise, relevant follow-up questions. "
+    "Always base your next question on the previous conversation. "
+    "Avoid yes/no, repetitive, or leading questions."
+)
 
-async def generate_followup_question(payload: InterviewRequest) -> str:
-    """Calls OpenAI to generate a follow-up question with rationale."""
+async def generate_followup_question(payload: InterviewRequest, session_id: str) -> str:
+    """Generate a follow-up question while keeping prior context."""
     
-    system_prompt = (
-        "You are an expert technical interviewer. "
-        "Given an interview question and the candidate’s answer, "
-        "generate one concise, contextually relevant follow-up question. "
-        "Do not repeat the original question or restate the answer. "
-        "Avoid asking yes/no questions. Keep it professional and insightful."
-    )
-
-    user_prompt = f"""
-Original Question: {payload.question}
-Candidate Answer: {payload.answer}
-Role: {payload.role or "Not specified"}
-Interview Type: {', '.join(payload.interview_type) if payload.interview_type else "General"}
-
-Now generate one short follow-up question the interviewer can ask next.
-"""
-
+    conversation = get_conversation(session_id)
+    
+    # If this is a new session, start fresh
+    if not conversation:
+        add_message(session_id, "system", SYSTEM_PROMPT)
+        add_message(session_id, "user", f"Original Question: {payload.question}")
+        add_message(session_id, "assistant", "(First follow-up question placeholder)")
+    
+    # Add candidate's latest answer
+    add_message(session_id, "user", f"Candidate Answer: {payload.answer}")
+    
+    # Send the full conversation context to OpenAI
     response = await client.chat.completions.create(
         model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-        ],
+        messages=get_conversation(session_id),
         max_tokens=100,
         temperature=0.7,
     )
 
-    return response.choices[0].message.content.strip()
+    followup = response.choices[0].message.content.strip()
+    add_message(session_id, "assistant", followup)
+
+    return followup
